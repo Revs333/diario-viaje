@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1E6A66">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mi diario">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Mi diario de viaje</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+/* Cuaderno de viaje: una columna estrecha, una pregunta por pantalla, botones grandes para el pulgar */
+:root{
+  --bg:#F3F6F4; --paper:#FFFFFF; --ink:#1B2A2C; --muted:#5A6B6B; --line:#D5DEDA;
+  --sea:#1E6A66; --sea-soft:#DCEDEA; --flower:#B5362F; --ok:#2E7D4F;
+  --display:"Newsreader",Georgia,"Times New Roman",serif;
+  --body:"Atkinson Hyperlegible",-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121A1B; --paper:#1A2526; --ink:#E9EFEC; --muted:#9FB0AE; --line:#2E3C3D;
+  --sea:#6CC1B9; --sea-soft:#1F3533; --flower:#F07A6E; --ok:#6FCB93; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121A1B; --paper:#1A2526; --ink:#E9EFEC; --muted:#9FB0AE; --line:#2E3C3D;
+  --sea:#6CC1B9; --sea-soft:#1F3533; --flower:#F07A6E; --ok:#6FCB93; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:19px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:620px;margin:0 auto;padding-block:20px 48px;display:flex;flex-direction:column;gap:22px}
+h1,h2{font-family:var(--display);font-weight:600;text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:2rem}
+h2{font-size:1.6rem}
+p{margin:0}
+.muted{color:var(--muted)}
+.eyebrow{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--sea);font-weight:700}
+button,.btn{font:inherit;cursor:pointer;border-radius:14px;border:2px solid transparent;min-height:58px;padding:12px 20px;font-weight:700}
+button:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--flower);outline-offset:2px}
+.primary{background:var(--sea);color:var(--paper);width:100%;font-size:1.15rem}
+.secondary{background:var(--paper);color:var(--sea);border-color:var(--sea);width:100%}
+.ghost{background:transparent;color:var(--muted);border-color:var(--line)}
+button:disabled{opacity:.5;cursor:default}
+.hero{display:flex;flex-direction:column;gap:8px}
+.days{display:flex;flex-direction:column;gap:12px}
+.day{display:grid;grid-template-columns:84px 1fr;gap:14px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px;text-align:left;color:var(--ink);font-weight:400;min-height:0;width:100%}
+.day .thumb{width:84px;height:84px;border-radius:10px;background:var(--sea-soft);object-fit:cover;display:flex;align-items:center;justify-content:center;color:var(--sea);font-family:var(--display);font-size:1.6rem}
+.day .t{min-width:0}
+.day .t strong{display:block;font-size:1.05rem}
+.day .t span{color:var(--muted);font-size:.9rem}
+.status{display:inline-block;font-size:.8rem;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--sea-soft);color:var(--sea);margin-top:4px}
+.status.pend{background:transparent;border:1px solid var(--flower);color:var(--flower)}
+.steps{display:flex;gap:6px}
+.steps i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps i.on{background:var(--sea)}
+.q{display:flex;flex-direction:column;gap:14px}
+textarea,input[type=text],input[type=date]{font:inherit;font-size:1.1rem;width:100%;box-sizing:border-box;border:2px solid var(--line);border-radius:14px;padding:14px;background:var(--paper);color:var(--ink)}
+textarea{min-height:220px;resize:vertical;line-height:1.5}
+.tip{font-size:.95rem;color:var(--muted);background:var(--sea-soft);border-radius:12px;padding:12px 14px}
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip{background:var(--paper);border:2px solid var(--line);color:var(--ink);min-height:52px;font-weight:700}
+.chip.on{border-color:var(--sea);background:var(--sea-soft);color:var(--sea)}
+.nav{display:grid;grid-template-columns:1fr 2fr;gap:12px}
+.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ph{position:relative;aspect-ratio:1;max-width:100%;border-radius:12px;overflow:hidden;background:var(--sea-soft)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .star{position:absolute;left:6px;top:6px;min-height:36px;padding:4px 10px;border-radius:99px;font-size:.8rem;background:var(--paper);color:var(--ink);border:1px solid var(--line)}
+.ph .star.on{background:var(--flower);color:var(--paper);border-color:var(--flower)}
+.ph .del{position:absolute;right:6px;top:6px;min-height:36px;width:36px;padding:0;border-radius:99px;background:var(--paper);color:var(--ink);border:1px solid var(--line)}
+.ph .wait{position:absolute;inset:auto 0 0 0;background:rgba(0,0,0,.55);color:#fff;font-size:.75rem;padding:4px;text-align:center}
+.add{border:2px dashed var(--sea);color:var(--sea);background:transparent;aspect-ratio:1;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:.95rem;min-height:0}
+.add b{font-size:2rem;line-height:1}
+.saved{font-size:.9rem;color:var(--ok);min-height:1.4em}
+.saved.warn{color:var(--flower)}
+.notice{background:var(--paper);border:2px solid var(--flower);border-radius:14px;padding:16px}
+.page{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:22px 20px;display:flex;flex-direction:column;gap:14px}
+.page h3{font-family:var(--display);font-size:1.5rem;margin:0;font-weight:600}
+.page .lbl{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--sea);font-weight:700}
+.page .txt{white-space:pre-wrap}
+.page .word{font-family:var(--display);font-size:1.8rem;color:var(--flower);text-align:center}
+.page .hero-img{width:100%;border-radius:4px;max-height:420px;object-fit:cover}
+.page .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.page .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>*{flex:1 1 160px}
+.done{text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center;padding-block:30px}
+.done .big{font-family:var(--display);font-size:2.2rem;color:var(--sea)}
+@media (prefers-reduced-motion:no-preference){.q,.done{animation:in .25s ease-out}}
+@keyframes in{from{transform:translateY(6px);opacity:.6}to{transform:none;opacity:1}}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <div class="hero">
+    <span class="eyebrow">Nueva Zelanda · Australia</span>
+    <h1>Mi diario de viaje</h1>
+    <p class="muted">Cargando tu diario…</p>
+  </div>
+</div>
+<input type="file" id="filepick" accept="image/*" multiple hidden>
+
+<script>
+(function(){
+const CFG = { url: 'https://skjeimnwxlklibrigqdf.supabase.co'.replace(/\/$/,''), key: 'sb_publishable_wZe5UWh1D8F99at3XC8VeQ_qEGO9po-' };
+const HDR = () => { const h={apikey:CFG.key}; if(!/^sb_/.test(CFG.key)) h.Authorization='Bearer '+CFG.key; return h; };
+const api = {
+  async list(){ const r=await fetch(CFG.url+'/rest/v1/dias?select=fecha,data',{headers:HDR()}); if(!r.ok) throw new Error(r.status); return r.json(); },
+  async save(fecha,data){ const r=await fetch(CFG.url+'/rest/v1/dias',{method:'POST',headers:Object.assign({'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},HDR()),body:JSON.stringify({fecha,data,actualizado:new Date().toISOString()})}); if(!r.ok) throw new Error(r.status); },
+  async upload(path,blob){ const r=await fetch(CFG.url+'/storage/v1/object/fotos/'+path,{method:'POST',headers:Object.assign({'Content-Type':'image/jpeg','x-upsert':'false'},HDR()),body:blob}); if(!r.ok) throw new Error(r.status); return path; }
+};
+const app = document.getElementById('app');
+const filepick = document.getElementById('filepick');
+
+const DAILY = [
+  "¿A qué olía hoy? ¿Qué sabor te ha sorprendido?",
+  "¿Has conocido a alguien hoy? Cuéntanos quién era.",
+  "¿Qué es lo que más te ha sorprendido del día?",
+  "¿A quién has echado de menos hoy, y por qué?",
+  "¿Qué sonido te llevarías de este lugar?",
+  "Si pudieras quedarte un rato más en un sitio de hoy, ¿cuál sería?",
+  "¿Qué te ha recordado a casa, a Tenerife?",
+  "¿Qué has aprendido hoy que no sabías?",
+  "¿Cuál ha sido el momento más tranquilo del día?",
+  "¿Qué le contarías a tus nietos de hoy?",
+  "¿Qué te ha hecho reír?",
+  "Describe el cielo de hoy."
+];
+const STEPS = ['lugar','fotos','vivido','visto','sentido','pregunta','palabra'];
+const ANTES = [
+  ['espera','¿Qué esperas encontrar en este viaje?'],
+  ['miedo','¿Hay algo que te dé respeto o te preocupe?'],
+  ['porque','¿Por qué haces este viaje ahora?']
+];
+
+let online=true;
+let days = {};      // fecha -> data
+let antes = null;
+let view = {name:'home'};
+let pendingPhotos = {}; // fecha -> [{key,url}]
+
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const fmtDate = iso => { try{ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});}catch(e){return iso;} };
+const blobUrl = id => CFG.url+'/storage/v1/object/public/fotos/'+id;
+const ls = { get(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}, del(k){try{localStorage.removeItem(k);}catch(e){}} };
+
+/* ---------- pending photos queue (IndexedDB) ---------- */
+let idb=null;
+function openIdb(){ return new Promise(res=>{ try{ const r=indexedDB.open('diario',1); r.onupgradeneeded=()=>r.result.createObjectStore('fotos',{keyPath:'key'}); r.onsuccess=()=>{idb=r.result;res(idb)}; r.onerror=()=>res(null);}catch(e){res(null)} }); }
+function idbAll(){ return new Promise(res=>{ if(!idb) return res([]); try{ const t=idb.transaction('fotos').objectStore('fotos').getAll(); t.onsuccess=()=>res(t.result||[]); t.onerror=()=>res([]);}catch(e){res([])} }); }
+function idbPut(o){ return new Promise(res=>{ if(!idb) return res(false); try{ const t=idb.transaction('fotos','readwrite'); t.objectStore('fotos').put(o); t.oncomplete=()=>res(true); t.onerror=()=>res(false);}catch(e){res(false)} }); }
+function idbDel(k){ return new Promise(res=>{ if(!idb) return res(); try{ const t=idb.transaction('fotos','readwrite'); t.objectStore('fotos').delete(k); t.oncomplete=()=>res(); t.onerror=()=>res();}catch(e){res()} }); }
+
+/* ---------- image compression ---------- */
+async function compress(file){
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=url; });
+    const max=1800; let w=img.naturalWidth,h=img.naturalHeight;
+    const s=Math.min(1,max/Math.max(w,h)); w=Math.round(w*s); h=Math.round(h*s);
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    const blob = await new Promise(r=>c.toBlob(r,'image/jpeg',0.84));
+    return blob || file;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/* ---------- saving ---------- */
+const saveTimers={}, saving={};
+let lastSaveMsg='';
+function setSaved(msg,warn){ lastSaveMsg=msg; const el=document.getElementById('saved'); if(el){el.textContent=msg; el.classList.toggle('warn',!!warn);} }
+function scheduleSave(path,data){
+  ls.set('draft:'+path,data);
+  clearTimeout(saveTimers[path]);
+  setSaved('Guardando…');
+  saveTimers[path]=setTimeout(()=>flush(path),900);
+}
+async function flush(path){
+  if(saving[path]){ saving[path].again=true; return; }
+  const data=ls.get('draft:'+path); if(!data) return;
+  saving[path]={again:false};
+  try{
+    await api.save(path.split('/')[1]==='antes'&&path.indexOf('portada/')===0?'antes':path.split('/')[1], data);
+    ls.del('draft:'+path);
+    setSaved('Guardado ✓');
+  }catch(e){
+    setSaved('Sin conexión: guardado en este móvil, se subirá solo.',true);
+  }
+  const again=saving[path].again; delete saving[path];
+  if(again) flush(path);
+}
+async function flushAllDrafts(){
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('draft:')===0) await flush(k.slice(6)); } }catch(e){}
+}
+async function uploadPending(){
+  const all=await idbAll();
+  for(const p of all){
+    try{
+      const r={id: await api.upload(p.fecha+'/'+p.key+'.jpg', p.blob)};
+      const d=days[p.fecha]||ls.get('draft:dias/'+p.fecha)||{fecha:p.fecha};
+      d.fotos=(d.fotos||[]).concat([{id:r.id}]);
+      if(!d.portada) d.portada=r.id;
+      days[p.fecha]=d;
+      await idbDel(p.key);
+      removePendingLocal(p.fecha,p.key);
+      scheduleSave('dias/'+p.fecha,d);
+      if(view.name==='edit'&&view.fecha===p.fecha) render();
+    }catch(e){ /* stays queued */ }
+  }
+}
+function removePendingLocal(fecha,key){ const l=pendingPhotos[fecha]; if(!l) return; const i=l.findIndex(x=>x.key===key); if(i>=0){ URL.revokeObjectURL(l[i].url); l.splice(i,1);} }
+window.addEventListener('online',()=>{ flushAllDrafts(); uploadPending(); });
+
+/* ---------- views ---------- */
+function hasContent(d){ return d.lugar||d.vivido||d.visto||d.sentido||d.respuesta||d.palabra||(d.fotos&&d.fotos.length)||(pendingPhotos[d.fecha]&&pendingPhotos[d.fecha].length); }
+function sortedDays(){ return Object.values(days).filter(d=>d&&d.fecha&&hasContent(d)).sort((a,b)=>a.fecha<b.fecha?-1:1); }
+function isComplete(d){ return d && d.vivido && d.visto && d.sentido; }
+
+function renderHome(){
+  const list=sortedDays();
+  const t=todayISO();
+  const hasToday=!!days[t];
+  let h=`<div class="hero"><span class="eyebrow">Nueva Zelanda · Australia</span><h1>Mi diario de viaje</h1>
+    <p class="muted">Cada día, unas fotos y tres preguntas. Al volver, todo esto será tu libro.</p></div>`;
+  if(!online) h+=`<p class="tip">Ahora no hay conexión. Puedes escribir igual: se enviará solo cuando vuelva.</p>`;
+  h+=`<button class="primary" data-act="today">${hasToday?'Seguir con mi día de hoy':'Escribir mi día de hoy'}</button>`;
+  if(!antes || !antes.espera) h+=`<button class="secondary" data-act="antes">Antes de salir: tres preguntas</button>`;
+  if(list.length){
+    h+=`<h2>Días escritos</h2><div class="days">`;
+    for(const d of list.slice().reverse()){
+      const cover=d.portada||(d.fotos&&d.fotos[0]&&d.fotos[0].id);
+      const thumb=cover?`<img class="thumb" src="${blobUrl(cover)}" alt="">`:`<span class="thumb">${esc((d.lugar||'·').charAt(0).toUpperCase())}</span>`;
+      h+=`<button class="day" data-act="open" data-fecha="${d.fecha}">${thumb}<span class="t"><strong>${esc(d.lugar||'Sin lugar todavía')}</strong><span>${esc(fmtDate(d.fecha))}</span><br><span class="status ${isComplete(d)?'':'pend'}">${isComplete(d)?'Completo':'A medias'}</span></span></button>`;
+    }
+    h+=`</div><button class="ghost" data-act="libro">Leer el diario como un libro</button>`;
+  } else {
+    h+=`<p class="muted">Aquí irán apareciendo los días que escribas, con su foto y su lugar.</p>`;
+  }
+  app.innerHTML=h;
+}
+
+function stepsBar(i){ return `<div class="steps">${STEPS.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`; }
+
+function renderEdit(){
+  const f=view.fecha, i=view.step;
+  const d=days[f]||(days[f]={fecha:f});
+  const key=STEPS[i];
+  let body='';
+  if(key==='lugar'){
+    body=`<span class="eyebrow">${esc(fmtDate(f))}</span><h2>¿Dónde estás hoy?</h2>
+      <input type="text" id="lugar" placeholder="Por ejemplo: Queenstown" value="${esc(d.lugar)}" autocomplete="off">
+      <div class="chips">${['Nueva Zelanda','Australia','En camino'].map(p=>`<button class="chip ${d.pais===p?'on':''}" data-act="pais" data-v="${p}">${p}</button>`).join('')}</div>
+      <details><summary class="muted">¿Escribes un día que ya pasó? Cambia la fecha</summary><input type="date" id="fecha" value="${f}" style="margin-top:10px"></details>`;
+  } else if(key==='fotos'){
+    const fotos=d.fotos||[]; const pend=pendingPhotos[f]||[];
+    body=`<h2>Las fotos del día</h2><p class="muted">Elige hasta seis. Toca la estrella en la que más te guste: será la grande del libro.</p>
+      <div class="photos">
+        ${fotos.map(p=>`<div class="ph"><img src="${blobUrl(p.id)}" alt=""><button class="star ${d.portada===p.id?'on':''}" data-act="star" data-id="${p.id}" aria-label="Elegir como principal">★</button><button class="del" data-act="delfoto" data-id="${p.id}" aria-label="Quitar foto">✕</button></div>`).join('')}
+        ${pend.map(p=>`<div class="ph"><img src="${p.url}" alt=""><span class="wait">Se subirá con cobertura</span></div>`).join('')}
+        ${(fotos.length+pend.length)<6?`<button class="add" data-act="addfoto"><b>+</b>Añadir</button>`:''}
+      </div>
+`;
+  } else if(key==='vivido'){
+    body=`<h2>¿Qué has vivido hoy?</h2><p class="muted">Lo que has hecho, por dónde has ido, qué ha pasado.</p>
+      <textarea id="txt" placeholder="Hoy…">${esc(d.vivido)}</textarea>
+      <p class="tip">Para no escribir, toca el micrófono del teclado y habla. El móvil lo escribe por ti.</p>`;
+  } else if(key==='visto'){
+    body=`<h2>¿Qué has visto?</h2><p class="muted">Un paisaje, un animal, una persona, un detalle que no quieres olvidar.</p>
+      <textarea id="txt" placeholder="He visto…">${esc(d.visto)}</textarea>`;
+  } else if(key==='sentido'){
+    body=`<h2>¿Qué has sentido?</h2><p class="muted">Lo que te ha emocionado, lo que te ha removido por dentro.</p>
+      <textarea id="txt" placeholder="He sentido…">${esc(d.sentido)}</textarea>`;
+  } else if(key==='pregunta'){
+    const q=d.pregunta||DAILY[(sortedDays().findIndex(x=>x.fecha===f)+DAILY.length)%DAILY.length]||DAILY[0];
+    d.pregunta=q;
+    body=`<span class="eyebrow">La pregunta de hoy · opcional</span><h2>${esc(q)}</h2>
+      <textarea id="txt" placeholder="Si te apetece…">${esc(d.respuesta)}</textarea>`;
+  } else if(key==='palabra'){
+    body=`<h2>Una palabra para hoy</h2><p class="muted">Solo una, la que resuma el día.</p>
+      <input type="text" id="palabra" value="${esc(d.palabra)}" placeholder="Por ejemplo: inmensidad" autocomplete="off">`;
+  }
+  const last=i===STEPS.length-1;
+  app.innerHTML=`${stepsBar(i)}<div class="q">${body}</div>
+    <div class="saved" id="saved">${esc(lastSaveMsg)}</div>
+    <div class="nav"><button class="ghost" data-act="back">${i===0?'Inicio':'Atrás'}</button><button class="primary" data-act="next">${last?'Terminar el día':'Siguiente'}</button></div>`;
+  bindInputs(f,key);
+}
+
+function bindInputs(f,key){
+  const d=days[f];
+  const save=()=>scheduleSave('dias/'+f,d);
+  const txt=document.getElementById('txt');
+  const map={vivido:'vivido',visto:'visto',sentido:'sentido',pregunta:'respuesta'};
+  if(txt){ txt.addEventListener('input',()=>{ d[map[key]]=txt.value; save(); }); }
+  const lugar=document.getElementById('lugar'); if(lugar) lugar.addEventListener('input',()=>{ d.lugar=lugar.value; save(); });
+  const pal=document.getElementById('palabra'); if(pal) pal.addEventListener('input',()=>{ d.palabra=pal.value.trim().split(/\s+/)[0]||''; save(); });
+  const fe=document.getElementById('fecha'); if(fe) fe.addEventListener('change',()=>{
+    const nf=fe.value; if(!nf||nf===f) return;
+    if(days[nf]){ view.fecha=nf; render(); return; }
+    const copy=Object.assign({},d,{fecha:nf}); days[nf]=copy;
+    if(!d.lugar&&!d.vivido&&!(d.fotos||[]).length){ delete days[f]; ls.del('draft:dias/'+f); }
+    view.fecha=nf; scheduleSave('dias/'+nf,copy); render();
+  });
+}
+
+function renderDone(){
+  const d=days[view.fecha]||{};
+  app.innerHTML=`<div class="done"><span class="big">Día guardado</span>
+    <p>${esc(d.lugar||'')}${d.palabra?' · <em>'+esc(d.palabra)+'</em>':''}</p>
+    <p class="muted">Ya forma parte de tu libro. Mañana, otro.</p></div>
+    <div class="saved" id="saved">${esc(lastSaveMsg)}</div>
+    <button class="primary" data-act="home">Volver al inicio</button>`;
+}
+
+function renderAntes(){
+  const a=antes||(antes={});
+  app.innerHTML=`<div class="q"><span class="eyebrow">Antes de salir</span><h2>Tres preguntas para hoy, antes del viaje</h2>
+    <p class="muted">Al volver las leerás otra vez. Suele ser lo más bonito del libro.</p>
+    ${ANTES.map(([k,q])=>`<label for="a_${k}"><strong>${esc(q)}</strong></label><textarea id="a_${k}" style="min-height:140px">${esc(a[k])}</textarea>`).join('')}
+    </div><div class="saved" id="saved"></div><button class="primary" data-act="home">Listo</button>`;
+  ANTES.forEach(([k])=>{ const el=document.getElementById('a_'+k); el.addEventListener('input',()=>{ a[k]=el.value; scheduleSave('portada/antes',a); }); });
+}
+
+function renderLibro(){
+  let h=`<button class="ghost" data-act="home">Volver al inicio</button><div class="hero"><span class="eyebrow">El libro</span><h1>Nueva Zelanda y Australia</h1></div>`;
+  if(antes&&(antes.espera||antes.miedo||antes.porque)){
+    h+=`<article class="page"><h3>Antes de salir</h3>${ANTES.map(([k,q])=>antes[k]?`<span class="lbl">${esc(q)}</span><p class="txt">${esc(antes[k])}</p>`:'').join('')}</article>`;
+  }
+  let lastPais='';
+  for(const d of sortedDays()){
+    if(d.pais&&d.pais!==lastPais&&d.pais!=='En camino'){ h+=`<h2>${esc(d.pais)}</h2>`; lastPais=d.pais; }
+    const fotos=(d.fotos||[]).map(p=>p.id); const cover=d.portada||fotos[0]; const rest=fotos.filter(x=>x!==cover);
+    h+=`<article class="page"><span class="lbl">${esc(fmtDate(d.fecha))}</span><h3>${esc(d.lugar||'')}</h3>
+      ${cover?`<img class="hero-img" src="${blobUrl(cover)}" alt="">`:''}
+      ${d.vivido?`<span class="lbl">Lo que viví</span><p class="txt">${esc(d.vivido)}</p>`:''}
+      ${d.visto?`<span class="lbl">Lo que vi</span><p class="txt">${esc(d.visto)}</p>`:''}
+      ${d.sentido?`<span class="lbl">Lo que sentí</span><p class="txt">${esc(d.sentido)}</p>`:''}
+      ${d.respuesta?`<span class="lbl">${esc(d.pregunta)}</span><p class="txt">${esc(d.respuesta)}</p>`:''}
+      ${rest.length?`<div class="grid">${rest.map(id=>`<img src="${blobUrl(id)}" alt="">`).join('')}</div>`:''}
+      ${d.palabra?`<p class="word">${esc(d.palabra)}</p>`:''}</article>`;
+  }
+  app.innerHTML=h;
+}
+
+function render(){
+  if(view.name==='edit') renderEdit();
+  else if(view.name==='done') renderDone();
+  else if(view.name==='antes') renderAntes();
+  else if(view.name==='libro') renderLibro();
+  else renderHome();
+  window.scrollTo(0,0);
+}
+
+/* ---------- actions ---------- */
+app.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const act=b.dataset.act;
+  if(act==='today'){ view={name:'edit',fecha:todayISO(),step:0}; render(); }
+  else if(act==='open'){ view={name:'edit',fecha:b.dataset.fecha,step:0}; render(); }
+  else if(act==='antes'){ view={name:'antes'}; render(); }
+  else if(act==='libro'){ view={name:'libro'}; render(); }
+  else if(act==='home'){ view={name:'home'}; render(); }
+  else if(act==='next'){ if(view.step<STEPS.length-1){ view.step++; render(); } else { flush('dias/'+view.fecha); view={name:'done',fecha:view.fecha}; render(); } }
+  else if(act==='back'){ if(view.step>0){ view.step--; render(); } else { view={name:'home'}; render(); } }
+  else if(act==='pais'){ const d=days[view.fecha]; d.pais=b.dataset.v; scheduleSave('dias/'+view.fecha,d); document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b)); }
+  else if(act==='addfoto'){ filepick.value=''; filepick.click(); }
+  else if(act==='star'){ const d=days[view.fecha]; d.portada=b.dataset.id; scheduleSave('dias/'+view.fecha,d); render(); }
+  else if(act==='delfoto'){
+    if(b.dataset.confirm!=='1'){ b.dataset.confirm='1'; b.textContent='¿Sí?'; b.style.width='auto'; b.style.padding='4px 10px'; return; }
+    const d=days[view.fecha]; d.fotos=(d.fotos||[]).filter(p=>p.id!==b.dataset.id); if(d.portada===b.dataset.id) d.portada=d.fotos[0]?d.fotos[0].id:null;
+    scheduleSave('dias/'+view.fecha,d); render();
+  }
+});
+
+filepick.addEventListener('change',async ()=>{
+  const f=view.fecha; const d=days[f];
+  const room=6-((d.fotos||[]).length+(pendingPhotos[f]||[]).length);
+  const files=Array.from(filepick.files||[]).slice(0,Math.max(0,room));
+  setSaved('Preparando fotos…');
+  for(const file of files){
+    let blob; try{ blob=await compress(file); }catch(e){ continue; }
+    const key=f+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
+    const url=URL.createObjectURL(blob);
+    (pendingPhotos[f]=pendingPhotos[f]||[]).push({key,url});
+    await idbPut({key,fecha:f,blob});
+    render();
+  }
+  await uploadPending();
+  setSaved((pendingPhotos[f]||[]).length?'Hay fotos esperando cobertura. Se subirán solas.':'Fotos guardadas ✓',(pendingPhotos[f]||[]).length>0);
+});
+
+/* ---------- boot ---------- */
+async function boot(){
+  await openIdb();
+  // restore local drafts first so nothing written offline is lost
+  try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('draft:dias/')===0){ const v=ls.get(k); if(v&&v.fecha) days[v.fecha]=v; } else if(k==='draft:portada/antes'){ antes=ls.get(k); } } }catch(e){}
+  for(const p of await idbAll()){ (pendingPhotos[p.fecha]=pendingPhotos[p.fecha]||[]).push({key:p.key,url:URL.createObjectURL(p.blob)}); if(!days[p.fecha]) days[p.fecha]={fecha:p.fecha}; }
+  render();
+  try{ const cache=ls.get('cache:dias'); if(cache) cache.forEach(r=>{ if(r.fecha==='antes'){ if(!ls.get('draft:portada/antes')) antes=r.data; } else if(!ls.get('draft:dias/'+r.fecha)) days[r.fecha]=r.data; }); }catch(e){}
+  render();
+  await refresh();
+  flushAllDrafts(); uploadPending();
+}
+async function refresh(){
+  try{
+    const rows=await api.list(); online=true;
+    ls.set('cache:dias',rows);
+    rows.forEach(r=>{ if(!r||!r.data) return; if(r.fecha==='antes'){ if(!ls.get('draft:portada/antes')) antes=r.data; } else if(!ls.get('draft:dias/'+r.fecha)) days[r.fecha]=r.data; });
+  }catch(e){ online=false; }
+  if(view.name==='home'||view.name==='libro') render();
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ refresh(); flushAllDrafts(); uploadPending(); } });
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+boot();
+})();
+</script>
+</body>
+</html>
