@@ -101,6 +101,16 @@ textarea{min-height:220px;resize:vertical;line-height:32px;background-image:repe
 .done .big{font-family:var(--display);font-size:3rem;color:var(--sea)}
 @media (prefers-reduced-motion:no-preference){.q,.done{animation:in .25s ease-out}}
 @keyframes in{from{transform:translateY(6px);opacity:.6}to{transform:none;opacity:1}}
+.rec{width:100%;min-height:88px;font-size:1.3rem;border-radius:50px;background:var(--flower);color:#fff;letter-spacing:.02em}
+.rec.on{background:var(--ink);color:var(--paper)}
+@media (prefers-reduced-motion:no-preference){.rec.on{animation:pulse 1.4s ease-in-out infinite}}
+@keyframes pulse{50%{box-shadow:0 0 0 10px rgba(176,67,47,.18)}}
+.auds{display:flex;flex-direction:column;gap:10px}
+.aud{display:flex;flex-direction:column;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.aud span{font-size:.9rem;color:var(--muted)}
+.aud audio{width:100%}
+section.q{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:18px 16px;box-shadow:0 2px 8px rgba(60,40,20,.08)}
+details summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
 </style>
 </head>
 <body>
@@ -121,7 +131,7 @@ const HDR = () => { const h={apikey:CFG.key}; if(!/^sb_/.test(CFG.key)) h.Author
 const api = {
   async list(){ const r=await fetch(CFG.url+'/rest/v1/dias?select=fecha,data',{headers:HDR()}); if(!r.ok) throw new Error(r.status); return r.json(); },
   async save(fecha,data){ const r=await fetch(CFG.url+'/rest/v1/dias',{method:'POST',headers:Object.assign({'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},HDR()),body:JSON.stringify({fecha,data,actualizado:new Date().toISOString()})}); if(!r.ok) throw new Error(r.status); },
-  async upload(path,blob){ const r=await fetch(CFG.url+'/storage/v1/object/fotos/'+path,{method:'POST',headers:Object.assign({'Content-Type':'image/jpeg','x-upsert':'false'},HDR()),body:blob}); if(!r.ok) throw new Error(r.status); return path; }
+  async upload(path,blob,type){ const r=await fetch(CFG.url+'/storage/v1/object/fotos/'+path,{method:'POST',headers:Object.assign({'Content-Type':type||'image/jpeg','x-upsert':'false'},HDR()),body:blob}); if(!r.ok) throw new Error(r.status); return path; }
 };
 const app = document.getElementById('app');
 const filepick = document.getElementById('filepick');
@@ -140,7 +150,6 @@ const DAILY = [
   "¿Qué te ha hecho reír?",
   "Describe el cielo de hoy."
 ];
-const STEPS = ['lugar','fotos','vivido','visto','sentido','pregunta','palabra'];
 const ANTES = [
   ['espera','¿Qué esperas encontrar en este viaje?'],
   ['miedo','¿Hay algo que te dé respeto o te preocupe?'],
@@ -211,117 +220,152 @@ async function uploadPending(){
   const all=await idbAll();
   for(const p of all){
     try{
-      const r={id: await api.upload(p.fecha+'/'+p.key+'.jpg', p.blob)};
+      const isAudio=p.kind==='audio';
+      const ext=isAudio?(p.blob.type.indexOf('mp4')>=0?'m4a':'webm'):'jpg';
+      const id=await api.upload(p.fecha+'/'+p.key+'.'+ext, p.blob, p.blob.type||(isAudio?'audio/mp4':'image/jpeg'));
       const d=days[p.fecha]||ls.get('draft:dias/'+p.fecha)||{fecha:p.fecha};
-      d.fotos=(d.fotos||[]).concat([{id:r.id}]);
-      if(!d.portada) d.portada=r.id;
+      if(isAudio){ d.audios=(d.audios||[]).concat([{id,seg:p.seg||0}]); }
+      else { d.fotos=(d.fotos||[]).concat([{id}]); if(!d.portada) d.portada=id; }
       days[p.fecha]=d;
       await idbDel(p.key);
       removePendingLocal(p.fecha,p.key);
       scheduleSave('dias/'+p.fecha,d);
-      if(view.name==='edit'&&view.fecha===p.fecha) render();
+      if(view.name==='edit'&&view.fecha===p.fecha&&!rec) render();
     }catch(e){ /* stays queued */ }
   }
 }
-function removePendingLocal(fecha,key){ const l=pendingPhotos[fecha]; if(!l) return; const i=l.findIndex(x=>x.key===key); if(i>=0){ URL.revokeObjectURL(l[i].url); l.splice(i,1);} }
+function removePendingLocal(fecha,key){ [pendingPhotos,pendingAudios].forEach(store=>{ const l=store[fecha]; if(!l) return; const i=l.findIndex(x=>x.key===key); if(i>=0){ URL.revokeObjectURL(l[i].url); l.splice(i,1);} }); }
 window.addEventListener('online',()=>{ flushAllDrafts(); uploadPending(); });
 
 /* ---------- views ---------- */
-function hasContent(d){ return d.lugar||d.vivido||d.visto||d.sentido||d.respuesta||d.palabra||(d.fotos&&d.fotos.length)||(pendingPhotos[d.fecha]&&pendingPhotos[d.fecha].length); }
+let pendingAudios = {};
+let rec=null; // {mr, chunks, start, timer, stream}
+function hasContent(d){ return d.lugar||d.texto||d.vivido||d.visto||d.sentido||d.respuesta||d.palabra||(d.fotos&&d.fotos.length)||(d.audios&&d.audios.length)||(pendingPhotos[d.fecha]&&pendingPhotos[d.fecha].length)||(pendingAudios[d.fecha]&&pendingAudios[d.fecha].length); }
 function sortedDays(){ return Object.values(days).filter(d=>d&&d.fecha&&hasContent(d)).sort((a,b)=>a.fecha<b.fecha?-1:1); }
-function isComplete(d){ return d && d.vivido && d.visto && d.sentido; }
+function hasStory(d){ return (d.audios&&d.audios.length)||(pendingAudios[d.fecha]&&pendingAudios[d.fecha].length)||d.texto||d.vivido; }
+function hasPhotos(d){ return (d.fotos&&d.fotos.length)||(pendingPhotos[d.fecha]&&pendingPhotos[d.fecha].length); }
+function isComplete(d){ return d && hasStory(d) && hasPhotos(d); }
+const mmss = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
 
 function renderHome(){
   const list=sortedDays();
   const t=todayISO();
-  const hasToday=!!days[t];
+  const hasToday=!!(days[t]&&hasContent(days[t]));
   let h=`<div class="hero"><span class="eyebrow">Nueva Zelanda · Australia</span><h1>Mi diario de viaje</h1>
-    <p class="muted">Cada día, unas fotos y tres preguntas. Al volver, todo esto será tu libro.</p></div>`;
-  if(!online) h+=`<p class="tip">Ahora no hay conexión. Puedes escribir igual: se enviará solo cuando vuelva.</p>`;
-  h+=`<button class="primary" data-act="today">${hasToday?'Seguir con mi día de hoy':'Escribir mi día de hoy'}</button>`;
+    <p class="muted">Cada noche, tus fotos y lo que quieras contar. Al volver, todo esto será tu libro.</p></div>`;
+  if(!online) h+=`<p class="tip">Ahora no hay conexión. Puedes usarlo igual: se enviará solo cuando vuelva.</p>`;
+  h+=`<button class="primary" data-act="today">${hasToday?'Seguir con mi día de hoy':'Contar mi día de hoy'}</button>`;
   if(!antes || !antes.espera) h+=`<button class="secondary" data-act="antes">Antes de salir: tres preguntas</button>`;
   if(list.length){
-    h+=`<h2>Días escritos</h2><div class="days">`;
+    h+=`<h2>Días contados</h2><div class="days">`;
     for(const d of list.slice().reverse()){
       const cover=d.portada||(d.fotos&&d.fotos[0]&&d.fotos[0].id);
       const thumb=cover?`<img class="thumb" src="${blobUrl(cover)}" alt="">`:`<span class="thumb">${esc((d.lugar||'·').charAt(0).toUpperCase())}</span>`;
-      h+=`<button class="day" data-act="open" data-fecha="${d.fecha}">${thumb}<span class="t"><strong>${esc(d.lugar||'Sin lugar todavía')}</strong><span>${esc(fmtDate(d.fecha))}</span><br><span class="status ${isComplete(d)?'':'pend'}">${isComplete(d)?'Completo':'A medias'}</span></span></button>`;
+      h+=`<button class="day" data-act="open" data-fecha="${d.fecha}">${thumb}<span class="t"><strong>${esc(d.lugar||'Sin lugar todavía')}</strong><span>${esc(fmtDate(d.fecha))}</span><br><span class="status ${isComplete(d)?'':'pend'}">${isComplete(d)?'Completo':(hasPhotos(d)?'Faltan tus palabras':'Faltan las fotos')}</span></span></button>`;
     }
-    h+=`</div><button class="ghost" data-act="libro">Leer el diario como un libro</button>`;
+    h+=`</div><button class="ghost" data-act="libro">Ver el diario como un libro</button>`;
   } else {
-    h+=`<p class="muted">Aquí irán apareciendo los días que escribas, con su foto y su lugar.</p>`;
+    h+=`<p class="muted">Aquí irán apareciendo los días que cuentes, con su foto y su lugar.</p>`;
   }
   app.innerHTML=h;
 }
 
-function stepsBar(i){ return `<div class="steps">${STEPS.map((_,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div>`; }
-
 function renderEdit(){
-  const f=view.fecha, i=view.step;
+  const f=view.fecha;
   const d=days[f]||(days[f]={fecha:f});
-  const key=STEPS[i];
-  let body='';
-  if(key==='lugar'){
-    body=`<span class="eyebrow">${esc(fmtDate(f))}</span><h2>¿Dónde estás hoy?</h2>
-      <input type="text" id="lugar" placeholder="Por ejemplo: Queenstown" value="${esc(d.lugar)}" autocomplete="off">
-      <div class="chips">${['Nueva Zelanda','Australia','En camino'].map(p=>`<button class="chip ${d.pais===p?'on':''}" data-act="pais" data-v="${p}">${p}</button>`).join('')}</div>
-      <details><summary class="muted">¿Escribes un día que ya pasó? Cambia la fecha</summary><input type="date" id="fecha" value="${f}" style="margin-top:10px"></details>`;
-  } else if(key==='fotos'){
-    const fotos=d.fotos||[]; const pend=pendingPhotos[f]||[];
-    body=`<h2>Las fotos del día</h2><p class="muted">Elige hasta seis. Toca la estrella en la que más te guste: será la grande del libro.</p>
-      <div class="photos">
-        ${fotos.map(p=>`<div class="ph"><img src="${blobUrl(p.id)}" alt=""><button class="star ${d.portada===p.id?'on':''}" data-act="star" data-id="${p.id}" aria-label="Elegir como principal">★</button><button class="del" data-act="delfoto" data-id="${p.id}" aria-label="Quitar foto">✕</button></div>`).join('')}
-        ${pend.map(p=>`<div class="ph"><img src="${p.url}" alt=""><span class="wait">Se subirá con cobertura</span></div>`).join('')}
-        ${(fotos.length+pend.length)<6?`<button class="add" data-act="addfoto"><b>+</b>Añadir</button>`:''}
-      </div>
-`;
-  } else if(key==='vivido'){
-    body=`<h2>¿Qué has vivido hoy?</h2><p class="muted">Lo que has hecho, por dónde has ido, qué ha pasado.</p>
-      <textarea id="txt" placeholder="Hoy…">${esc(d.vivido)}</textarea>
-      <p class="tip">Para no escribir, toca el micrófono del teclado y habla. El móvil lo escribe por ti.</p>`;
-  } else if(key==='visto'){
-    body=`<h2>¿Qué has visto?</h2><p class="muted">Un paisaje, un animal, una persona, un detalle que no quieres olvidar.</p>
-      <textarea id="txt" placeholder="He visto…">${esc(d.visto)}</textarea>`;
-  } else if(key==='sentido'){
-    body=`<h2>¿Qué has sentido?</h2><p class="muted">Lo que te ha emocionado, lo que te ha removido por dentro.</p>
-      <textarea id="txt" placeholder="He sentido…">${esc(d.sentido)}</textarea>`;
-  } else if(key==='pregunta'){
-    const q=d.pregunta||DAILY[(sortedDays().findIndex(x=>x.fecha===f)+DAILY.length)%DAILY.length]||DAILY[0];
-    d.pregunta=q;
-    body=`<span class="eyebrow">La pregunta de hoy · opcional</span><h2>${esc(q)}</h2>
-      <textarea id="txt" placeholder="Si te apetece…">${esc(d.respuesta)}</textarea>`;
-  } else if(key==='palabra'){
-    body=`<h2>Una palabra para hoy</h2><p class="muted">Solo una, la que resuma el día.</p>
-      <input type="text" id="palabra" value="${esc(d.palabra)}" placeholder="Por ejemplo: inmensidad" autocomplete="off">`;
-  }
-  const last=i===STEPS.length-1;
-  app.innerHTML=`${stepsBar(i)}<div class="q">${body}</div>
-    <div class="saved" id="saved">${esc(lastSaveMsg)}</div>
-    <div class="nav"><button class="ghost" data-act="back">${i===0?'Inicio':'Atrás'}</button><button class="primary" data-act="next">${last?'Terminar el día':'Siguiente'}</button></div>`;
-  bindInputs(f,key);
+  const fotos=d.fotos||[], pend=pendingPhotos[f]||[];
+  const auds=d.audios||[], pa=pendingAudios[f]||[];
+  const q=d.pregunta||(d.pregunta=DAILY[Math.abs(f.split('-').reduce((a,b)=>a+Number(b),0))%DAILY.length]);
+  app.innerHTML=`
+  <button class="ghost" data-act="home" style="align-self:flex-start;min-height:48px">‹ Inicio</button>
+  <div class="hero"><span class="eyebrow">${esc(fmtDate(f))}</span><h1>Mi día de hoy</h1></div>
+
+  <section class="q">
+    <h2>1. ¿Dónde estás?</h2>
+    <input type="text" id="lugar" placeholder="Por ejemplo: Queenstown" value="${esc(d.lugar)}" autocomplete="off">
+    <div class="chips">${['Nueva Zelanda','Australia','En camino'].map(p=>`<button class="chip ${d.pais===p?'on':''}" data-act="pais" data-v="${p}">${p}</button>`).join('')}</div>
+  </section>
+
+  <section class="q">
+    <h2>2. Tus fotos</h2>
+    <div class="photos">
+      ${fotos.map(p=>`<div class="ph"><img src="${blobUrl(p.id)}" alt=""><button class="star ${d.portada===p.id?'on':''}" data-act="star" data-id="${p.id}" aria-label="La favorita">★</button><button class="del" data-act="delfoto" data-id="${p.id}" aria-label="Quitar foto">✕</button></div>`).join('')}
+      ${pend.map(p=>`<div class="ph"><img src="${p.url}" alt=""><span class="wait">Se enviará con cobertura</span></div>`).join('')}
+      ${(fotos.length+pend.length)<8?`<button class="add" data-act="addfoto"><b>+</b>Añadir fotos</button>`:''}
+    </div>
+    <p class="muted" style="font-size:.95rem">La de la estrella será la foto grande del libro.</p>
+  </section>
+
+  <section class="q">
+    <h2>3. Cuéntame tu día</h2>
+    <p>Habla como si me lo contaras por teléfono: <strong>qué has hecho, qué has visto y qué has sentido.</strong></p>
+    <p class="tip">Y si te apetece: ${esc(q)}</p>
+    <button class="rec ${rec?'on':''}" id="recbtn" data-act="rec">${rec?'■ Terminar <span id="rectime">'+mmss((Date.now()-rec.start)/1000)+'</span>':'● Pulsa y habla'}</button>
+    <div class="auds">
+      ${auds.map((a,k)=>`<div class="aud"><span>Grabación ${k+1}</span><audio controls preload="none" src="${blobUrl(a.id)}"></audio></div>`).join('')}
+      ${pa.map((a,k)=>`<div class="aud"><span>Grabación ${auds.length+k+1} · se enviará con cobertura</span><audio controls src="${a.url}"></audio></div>`).join('')}
+    </div>
+    <p class="saved" id="recmsg"></p>
+    <details ${d.texto?'open':''}><summary class="muted">Prefiero escribirlo</summary>
+      <textarea id="texto" placeholder="Hoy…" style="margin-top:10px">${esc(d.texto)}</textarea>
+    </details>
+  </section>
+
+  <div class="saved" id="saved">${esc(lastSaveMsg)}</div>
+  <button class="primary" data-act="fin">He terminado por hoy</button>
+  <details><summary class="muted">¿Es de otro día? Cambia la fecha</summary><input type="date" id="fecha" value="${f}" style="margin-top:10px"></details>`;
+  bindInputs(f);
 }
 
-function bindInputs(f,key){
+function bindInputs(f){
   const d=days[f];
   const save=()=>scheduleSave('dias/'+f,d);
-  const txt=document.getElementById('txt');
-  const map={vivido:'vivido',visto:'visto',sentido:'sentido',pregunta:'respuesta'};
-  if(txt){ txt.addEventListener('input',()=>{ d[map[key]]=txt.value; save(); }); }
+  const tx=document.getElementById('texto'); if(tx) tx.addEventListener('input',()=>{ d.texto=tx.value; save(); });
   const lugar=document.getElementById('lugar'); if(lugar) lugar.addEventListener('input',()=>{ d.lugar=lugar.value; save(); });
-  const pal=document.getElementById('palabra'); if(pal) pal.addEventListener('input',()=>{ d.palabra=pal.value.trim().split(/\s+/)[0]||''; save(); });
   const fe=document.getElementById('fecha'); if(fe) fe.addEventListener('change',()=>{
     const nf=fe.value; if(!nf||nf===f) return;
-    if(days[nf]){ view.fecha=nf; render(); return; }
+    if(days[nf]&&hasContent(days[nf])){ view.fecha=nf; render(); return; }
     const copy=Object.assign({},d,{fecha:nf}); days[nf]=copy;
-    if(!d.lugar&&!d.vivido&&!(d.fotos||[]).length){ delete days[f]; ls.del('draft:dias/'+f); }
+    if(!hasContent(d)){ delete days[f]; ls.del('draft:dias/'+f); }
     view.fecha=nf; scheduleSave('dias/'+nf,copy); render();
   });
+}
+
+async function toggleRec(){
+  const msg=t=>{ const el=document.getElementById('recmsg'); if(el){ el.textContent=t; el.classList.add('warn'); } };
+  if(rec){ rec.mr.stop(); return; }
+  if(!navigator.mediaDevices||!window.MediaRecorder){ msg('Este móvil no deja grabar aquí. Usa "Prefiero escribirlo" y el micrófono del teclado.'); return; }
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ msg('Hace falta dar permiso al micrófono. Toca otra vez y elige "Permitir".'); return; }
+  const type=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+  const mr=type?new MediaRecorder(stream,{mimeType:type}):new MediaRecorder(stream);
+  const f=view.fecha;
+  rec={mr,chunks:[],start:Date.now(),stream};
+  mr.ondataavailable=e=>{ if(e.data&&e.data.size) rec.chunks.push(e.data); };
+  mr.onstop=async ()=>{
+    const r=rec; rec=null; clearInterval(r.timer); r.stream.getTracks().forEach(t=>t.stop());
+    const blob=new Blob(r.chunks,{type:(mr.mimeType||type||'audio/mp4').split(';')[0]});
+    const seg=Math.round((Date.now()-r.start)/1000);
+    if(blob.size<1000){ render(); return; }
+    const key=f+'-a'+Date.now();
+    (pendingAudios[f]=pendingAudios[f]||[]).push({key,url:URL.createObjectURL(blob)});
+    await idbPut({key,fecha:f,blob,kind:'audio',seg});
+    if(!days[f]) days[f]={fecha:f};
+    scheduleSave('dias/'+f,days[f]);
+    render();
+    await uploadPending();
+    setSaved((pendingAudios[f]||[]).length?'Grabación guardada en el móvil. Se enviará con cobertura.':'Grabación guardada ✓',(pendingAudios[f]||[]).length>0);
+  };
+  mr.start(1000);
+  rec.timer=setInterval(()=>{ const el=document.getElementById('rectime'); if(el) el.textContent=mmss((Date.now()-rec.start)/1000); if(Date.now()-rec.start>15*60*1000) rec.mr.stop(); },500);
+  const b=document.getElementById('recbtn'); if(b){ b.classList.add('on'); b.innerHTML='■ Terminar <span id="rectime">0:00</span>'; }
 }
 
 function renderDone(){
   const d=days[view.fecha]||{};
   app.innerHTML=`<div class="done"><span class="big">Día guardado</span>
-    <p>${esc(d.lugar||'')}${d.palabra?' · <em>'+esc(d.palabra)+'</em>':''}</p>
+    <p>${esc(d.lugar||'')}</p>
     <p class="muted">Ya forma parte de tu libro. Mañana, otro.</p></div>
     <div class="saved" id="saved">${esc(lastSaveMsg)}</div>
     <button class="primary" data-act="home">Volver al inicio</button>`;
@@ -329,7 +373,7 @@ function renderDone(){
 
 function renderAntes(){
   const a=antes||(antes={});
-  app.innerHTML=`<div class="q"><span class="eyebrow">Antes de salir</span><h2>Tres preguntas para hoy, antes del viaje</h2>
+  app.innerHTML=`<div class="q"><span class="eyebrow">Antes de salir</span><h2>Tres preguntas antes del viaje</h2>
     <p class="muted">Al volver las leerás otra vez. Suele ser lo más bonito del libro.</p>
     ${ANTES.map(([k,q])=>`<label for="a_${k}"><strong>${esc(q)}</strong></label><textarea id="a_${k}" style="min-height:140px">${esc(a[k])}</textarea>`).join('')}
     </div><div class="saved" id="saved"></div><button class="primary" data-act="home">Listo</button>`;
@@ -337,7 +381,7 @@ function renderAntes(){
 }
 
 function renderLibro(){
-  let h=`<button class="ghost" data-act="home">Volver al inicio</button><div class="hero"><span class="eyebrow">El libro</span><h1>Nueva Zelanda y Australia</h1></div>`;
+  let h=`<button class="ghost" data-act="home" style="align-self:flex-start;min-height:48px">‹ Inicio</button><div class="hero"><span class="eyebrow">El libro</span><h1>Nueva Zelanda y Australia</h1></div>`;
   if(antes&&(antes.espera||antes.miedo||antes.porque)){
     h+=`<article class="page"><h3>Antes de salir</h3>${ANTES.map(([k,q])=>antes[k]?`<span class="lbl">${esc(q)}</span><p class="txt">${esc(antes[k])}</p>`:'').join('')}</article>`;
   }
@@ -347,12 +391,13 @@ function renderLibro(){
     const fotos=(d.fotos||[]).map(p=>p.id); const cover=d.portada||fotos[0]; const rest=fotos.filter(x=>x!==cover);
     h+=`<article class="page"><span class="lbl">${esc(fmtDate(d.fecha))}</span><h3>${esc(d.lugar||'')}</h3>
       ${cover?`<img class="hero-img" src="${blobUrl(cover)}" alt="">`:''}
+      ${(d.audios||[]).map((a,k)=>`<div class="aud"><span>Su voz · ${k+1}</span><audio controls preload="none" src="${blobUrl(a.id)}"></audio></div>`).join('')}
+      ${d.texto?`<p class="txt">${esc(d.texto)}</p>`:''}
       ${d.vivido?`<span class="lbl">Lo que viví</span><p class="txt">${esc(d.vivido)}</p>`:''}
       ${d.visto?`<span class="lbl">Lo que vi</span><p class="txt">${esc(d.visto)}</p>`:''}
       ${d.sentido?`<span class="lbl">Lo que sentí</span><p class="txt">${esc(d.sentido)}</p>`:''}
-      ${d.respuesta?`<span class="lbl">${esc(d.pregunta)}</span><p class="txt">${esc(d.respuesta)}</p>`:''}
       ${rest.length?`<div class="grid">${rest.map(id=>`<img src="${blobUrl(id)}" alt="">`).join('')}</div>`:''}
-      ${d.palabra?`<p class="word">${esc(d.palabra)}</p>`:''}</article>`;
+      </article>`;
   }
   app.innerHTML=h;
 }
@@ -363,20 +408,20 @@ function render(){
   else if(view.name==='antes') renderAntes();
   else if(view.name==='libro') renderLibro();
   else renderHome();
-  window.scrollTo(0,0);
 }
 
 /* ---------- actions ---------- */
 app.addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]'); if(!b) return;
   const act=b.dataset.act;
-  if(act==='today'){ view={name:'edit',fecha:todayISO(),step:0}; render(); }
-  else if(act==='open'){ view={name:'edit',fecha:b.dataset.fecha,step:0}; render(); }
-  else if(act==='antes'){ view={name:'antes'}; render(); }
-  else if(act==='libro'){ view={name:'libro'}; render(); }
-  else if(act==='home'){ view={name:'home'}; render(); }
-  else if(act==='next'){ if(view.step<STEPS.length-1){ view.step++; render(); } else { flush('dias/'+view.fecha); view={name:'done',fecha:view.fecha}; render(); } }
-  else if(act==='back'){ if(view.step>0){ view.step--; render(); } else { view={name:'home'}; render(); } }
+  const go=v=>{ if(rec) return; view=v; render(); window.scrollTo(0,0); };
+  if(act==='today') go({name:'edit',fecha:todayISO()});
+  else if(act==='open') go({name:'edit',fecha:b.dataset.fecha});
+  else if(act==='antes') go({name:'antes'});
+  else if(act==='libro') go({name:'libro'});
+  else if(act==='home') go({name:'home'});
+  else if(act==='fin'){ if(rec) rec.mr.stop(); flush('dias/'+view.fecha); view={name:'done',fecha:view.fecha}; render(); window.scrollTo(0,0); }
+  else if(act==='rec') toggleRec();
   else if(act==='pais'){ const d=days[view.fecha]; d.pais=b.dataset.v; scheduleSave('dias/'+view.fecha,d); document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b)); }
   else if(act==='addfoto'){ filepick.value=''; filepick.click(); }
   else if(act==='star'){ const d=days[view.fecha]; d.portada=b.dataset.id; scheduleSave('dias/'+view.fecha,d); render(); }
@@ -389,19 +434,18 @@ app.addEventListener('click',async e=>{
 
 filepick.addEventListener('change',async ()=>{
   const f=view.fecha; const d=days[f];
-  const room=6-((d.fotos||[]).length+(pendingPhotos[f]||[]).length);
+  const room=8-((d.fotos||[]).length+(pendingPhotos[f]||[]).length);
   const files=Array.from(filepick.files||[]).slice(0,Math.max(0,room));
   setSaved('Preparando fotos…');
   for(const file of files){
     let blob; try{ blob=await compress(file); }catch(e){ continue; }
     const key=f+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7);
-    const url=URL.createObjectURL(blob);
-    (pendingPhotos[f]=pendingPhotos[f]||[]).push({key,url});
-    await idbPut({key,fecha:f,blob});
+    (pendingPhotos[f]=pendingPhotos[f]||[]).push({key,url:URL.createObjectURL(blob)});
+    await idbPut({key,fecha:f,blob,kind:'foto'});
     render();
   }
   await uploadPending();
-  setSaved((pendingPhotos[f]||[]).length?'Hay fotos esperando cobertura. Se subirán solas.':'Fotos guardadas ✓',(pendingPhotos[f]||[]).length>0);
+  setSaved((pendingPhotos[f]||[]).length?'Hay fotos esperando cobertura. Se enviarán solas.':'Fotos guardadas ✓',(pendingPhotos[f]||[]).length>0);
 });
 
 /* ---------- boot ---------- */
@@ -409,7 +453,7 @@ async function boot(){
   await openIdb();
   // restore local drafts first so nothing written offline is lost
   try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.indexOf('draft:dias/')===0){ const v=ls.get(k); if(v&&v.fecha) days[v.fecha]=v; } else if(k==='draft:portada/antes'){ antes=ls.get(k); } } }catch(e){}
-  for(const p of await idbAll()){ (pendingPhotos[p.fecha]=pendingPhotos[p.fecha]||[]).push({key:p.key,url:URL.createObjectURL(p.blob)}); if(!days[p.fecha]) days[p.fecha]={fecha:p.fecha}; }
+  for(const p of await idbAll()){ const st=p.kind==='audio'?pendingAudios:pendingPhotos; (st[p.fecha]=st[p.fecha]||[]).push({key:p.key,url:URL.createObjectURL(p.blob)}); if(!days[p.fecha]) days[p.fecha]={fecha:p.fecha}; }
   render();
   try{ const cache=ls.get('cache:dias'); if(cache) cache.forEach(r=>{ if(r.fecha==='antes'){ if(!ls.get('draft:portada/antes')) antes=r.data; } else if(!ls.get('draft:dias/'+r.fecha)) days[r.fecha]=r.data; }); }catch(e){}
   render();
